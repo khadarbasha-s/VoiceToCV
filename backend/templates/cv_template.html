@@ -1,0 +1,57 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>CV Preview</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Inline minimal Tailwind CDN for server-side preview -->
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-blue-50 p-8">
+  <div class="max-w-3xl mx-auto bg-white rounded-lg shadow p-8">
+    <header class="border-b pb-4">
+      <h1 class="text-3xl font-bold text-blue-700">{{ cv.personal_info.name or "" }}</h1>
+      <p class="text-sm text-gray-600">
+        {{ cv.personal_info.email or "" }} | {{ cv.personal_info.phone or "" }} | {{ cv.personal_info.address or "" }}
+      </p>
+    </header>
+
+    <section class="mt-6">
+      <h2 class="text-xl font-semibold text-blue-600">Education</h2>
+      {% for ed in cv.education %}
+      <div class="mt-2">
+        <p class="font-medium">{{ ed.degree }} - {{ ed.institute }}</p>
+        <p class="text-sm text-gray-600">{{ ed.start_year }} - {{ ed.end_year }}</p>
+      </div>
+      {% endfor %}
+    </section>
+
+    <section class="mt-6">
+      <h2 class="text-xl font-semibold text-blue-600">Experience</h2>
+      {% for ex in cv.experience %}
+      <div class="mt-2">
+        <p class="font-medium">{{ ex.role }} at {{ ex.company }}</p>
+        <p class="text-sm text-gray-600">{{ ex.start_date }} - {{ ex.end_date }}</p>
+        <p class="mt-1">{{ ex.description }}</p>
+      </div>
+      {% endfor %}
+    </section>
+
+    <section class="mt-6">
+      <h2 class="text-xl font-semibold text-blue-600">Skills</h2>
+      <p class="mt-2">{{ cv.skills | join(', ') }}</p>
+    </section>
+
+    <section class="mt-6">
+      <h2 class="text-xl font-semibold text-blue-600">Projects</h2>
+      {% for p in cv.projects %}
+      <div class="mt-2">
+        <p class="font-medium">{{ p.project_name }}</p>
+        <p>{{ p.description }}</p>
+      </div>
+      {% endfor %}
+    </section>
+
+  </div>
+</body>
+</html>

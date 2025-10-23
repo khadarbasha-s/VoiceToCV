@@ -1,0 +1,17 @@
+Django>=4.2
+djangorestframework
+python-dotenv
+openai
+langchain
+faster-whisper
+pyttsx3
+jinja2
+weasyprint
+python-docx
+reportlab
+uvicorn
+gunicorn
+whitenoise
+pydub
+protobuf>=4.21.0
+django-cors-headers
