@@ -4,6 +4,28 @@ import io
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 
+def _ensure_list(value):
+    if isinstance(value, list):
+        return value
+    if value in (None, ""):
+        return []
+    if isinstance(value, dict):
+        return [value]
+    return [value]
+
+
+def _normalize_entry(entry, key_map=None):
+    if isinstance(entry, dict):
+        if key_map:
+            for alias, target in key_map.items():
+                if alias in entry and target not in entry:
+                    entry[target] = entry[alias]
+        return entry
+    if isinstance(entry, str):
+        return {"description": entry}
+    return {}
+
+
 def render_html(cv_json):
     env = Environment(loader=FileSystemLoader(TEMPLATES_DIR))
     template = env.get_template("cv_template.html")
@@ -79,45 +101,71 @@ def generate_pdf_bytes(cv_json):
         story.append(Spacer(1, 12))
 
         # Education
-        education = cv_json.get("education", [])
+        education = _ensure_list(cv_json.get("education", []))
+        education = [
+            _normalize_entry(ed, {"college": "institute"}) for ed in education
+        ]
         if education:
             story.append(Paragraph("Education", section_style))
             for ed in education:
-                story.append(Paragraph(
-                    f"{ed.get('degree', '')} - {ed.get('institute', '')} ({ed.get('start_year', '')} - {ed.get('end_year', '')})",
-                    content_style
-                ))
+                if not ed:
+                    continue
+                degree = ed.get('degree', '') or ed.get('description', '')
+                institute = ed.get('institute', '')
+                start_year = ed.get('start_year', '')
+                end_year = ed.get('end_year', '')
+                line = f"{degree} - {institute} ({start_year} - {end_year})"
+                story.append(Paragraph(line.strip(" -()"), content_style))
             story.append(Spacer(1, 12))
 
         # Experience
-        experience = cv_json.get("experience", [])
+        experience = _ensure_list(cv_json.get("experience", []))
+        experience = [_normalize_entry(exp) for exp in experience]
         if experience:
             story.append(Paragraph("Experience", section_style))
             for exp in experience:
-                story.append(Paragraph(
-                    f"{exp.get('role', '')} at {exp.get('company', '')} ({exp.get('start_date', '')} - {exp.get('end_date', '')})",
-                    content_style
-                ))
-                if exp.get('description'):
-                    story.append(Paragraph(exp.get('description', ''), content_style))
+                if not exp:
+                    continue
+                role = exp.get('role', '') or exp.get('description', '')
+                company = exp.get('company', '')
+                start_date = exp.get('start_date', '')
+                end_date = exp.get('end_date', '')
+                line = f"{role} at {company} ({start_date} - {end_date})"
+                story.append(Paragraph(line.strip(" -()"), content_style))
+                description = exp.get('description')
+                if description and description != role:
+                    story.append(Paragraph(description, content_style))
             story.append(Spacer(1, 12))
 
         # Skills
-        skills = cv_json.get("skills", [])
+        skills = _ensure_list(cv_json.get("skills", []))
         if skills:
             story.append(Paragraph("Skills", section_style))
-            story.append(Paragraph(", ".join(skills), content_style))
+            flattened = []
+            for skill in skills:
+                if isinstance(skill, str):
+                    flattened.append(skill)
+                elif isinstance(skill, dict):
+                    flattened.extend(
+                        v for v in skill.values() if isinstance(v, str)
+                    )
+            story.append(Paragraph(", ".join(flattened), content_style))
             story.append(Spacer(1, 12))
 
         # Projects
-        projects = cv_json.get("projects", [])
+        projects = _ensure_list(cv_json.get("projects", []))
+        projects = [_normalize_entry(proj) for proj in projects]
         if projects:
             story.append(Paragraph("Projects", section_style))
             for proj in projects:
-                story.append(Paragraph(
-                    f"{proj.get('project_name', '')} - {proj.get('description', '')}",
-                    content_style
-                ))
+                if not proj:
+                    continue
+                name = proj.get('project_name', '') or proj.get('description', '')
+                description = proj.get('description', '')
+                line = name
+                if description and description != name:
+                    line = f"{name} - {description}"
+                story.append(Paragraph(line, content_style))
             story.append(Spacer(1, 12))
 
         # Build PDF

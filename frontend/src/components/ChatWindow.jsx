@@ -9,6 +9,9 @@ const ChatWindow = () => {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [sessionId, setSessionId] = useState(null);
+  const [resumePreview, setResumePreview] = useState(null);
+  const [resumePreviewType, setResumePreviewType] = useState(null);
+  const [resumeFiles, setResumeFiles] = useState({ pdf_base64: null, docx_base64: null });
 
   // Create session on mount
   React.useEffect(() => {
@@ -60,44 +63,29 @@ const ChatWindow = () => {
       console.log("Resume response:", res.data);  // Log to inspect
       const { pdf_base64, docx_base64, html_content, note } = res.data;
 
-      // Handle DOCX download (always available)
-      if (docx_base64) {
-        const docxBlob = new Blob([Uint8Array.from(atob(docx_base64), c => c.charCodeAt(0))], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
-        const docxUrl = URL.createObjectURL(docxBlob);
-        const docxLink = document.createElement('a');
-        docxLink.href = docxUrl;
-        docxLink.download = 'resume.docx';
-        docxLink.click();
+      // Store preview and file data for inline display and manual download
+      if (html_content) {
+        setResumePreview(html_content);
+        setResumePreviewType("html");
+      } else if (pdf_base64) {
+        setResumePreview(pdf_base64);
+        setResumePreviewType("pdf");
+      } else if (docx_base64) {
+        setResumePreview("Preview is not available. Please use the buttons above to download your resume.");
+        setResumePreviewType("message");
+      } else {
+        setResumePreview(null);
+        setResumePreviewType(null);
       }
 
-      // Handle PDF or HTML download
-      if (pdf_base64) {
-        // PDF is available (either WeasyPrint or ReportLab)
-        const pdfBlob = new Blob([Uint8Array.from(atob(pdf_base64), c => c.charCodeAt(0))], { type: 'application/pdf' });
-        const pdfUrl = URL.createObjectURL(pdfBlob);
-        const pdfLink = document.createElement('a');
-        pdfLink.href = pdfUrl;
-        pdfLink.download = 'resume.pdf';
-        pdfLink.click();
-      } else if (html_content) {
-        // Fallback to HTML
-        const htmlBlob = new Blob([html_content], { type: 'text/html' });
-        const htmlUrl = URL.createObjectURL(htmlBlob);
-        const htmlLink = document.createElement('a');
-        htmlLink.href = htmlUrl;
-        htmlLink.download = 'resume.html';
-        htmlLink.click();
-
-        // Also open in new tab for preview
-        window.open(htmlUrl, '_blank');
-      }
+      setResumeFiles({ pdf_base64: pdf_base64 || null, docx_base64: docx_base64 || null });
 
       const successMsg = {
         sender: "agent",
         text: note || "Resume generated successfully! " +
-        (pdf_base64 ? "PDF and DOCX downloaded." :
-         html_content ? "DOCX and HTML preview downloaded (PDF generation requires additional setup)." :
-         "DOCX downloaded.")
+        (pdf_base64 ? "PDF and DOCX are ready to download." :
+         html_content ? "DOCX is ready to download and an HTML preview is available (PDF generation requires additional setup)." :
+         "DOCX is ready to download.")
       };
       setMessages((prev) => [...prev, successMsg]);
     } catch (error) {
@@ -140,6 +128,69 @@ const ChatWindow = () => {
       >
         Generate Resume
       </button>
+
+      {(resumePreviewType || resumeFiles.pdf_base64 || resumeFiles.docx_base64) && (
+        <div className="mt-4 border rounded-md p-3 bg-white max-h-[60vh] overflow-y-auto space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold text-lg">Resume Preview & Downloads</h2>
+            <div className="space-x-2">
+              {resumeFiles.pdf_base64 && (
+                <button
+                  onClick={() => {
+                    const pdfBlob = new Blob([
+                      Uint8Array.from(atob(resumeFiles.pdf_base64), (c) => c.charCodeAt(0)),
+                    ], { type: 'application/pdf' });
+                    const pdfUrl = URL.createObjectURL(pdfBlob);
+                    const link = document.createElement('a');
+                    link.href = pdfUrl;
+                    link.download = 'resume.pdf';
+                    link.click();
+                  }}
+                  className="text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
+                >
+                  Download PDF
+                </button>
+              )}
+              {resumeFiles.docx_base64 && (
+                <button
+                  onClick={() => {
+                    const docxBlob = new Blob([
+                      Uint8Array.from(atob(resumeFiles.docx_base64), (c) => c.charCodeAt(0)),
+                    ], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+                    const docxUrl = URL.createObjectURL(docxBlob);
+                    const link = document.createElement('a');
+                    link.href = docxUrl;
+                    link.download = 'resume.docx';
+                    link.click();
+                  }}
+                  className="text-sm bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
+                >
+                  Download DOCX
+                </button>
+              )}
+            </div>
+          </div>
+
+          {resumePreviewType === "html" && (
+            <div
+              className="prose max-w-none text-sm"
+              dangerouslySetInnerHTML={{ __html: resumePreview }}
+            />
+          )}
+
+          {resumePreviewType === "pdf" && (
+            <iframe
+              title="Resume PDF Preview"
+              src={`data:application/pdf;base64,${resumePreview}`}
+              className="w-full h-[50vh] border"
+            />
+          )}
+
+          {resumePreviewType === "message" && (
+            <p className="text-sm text-gray-600">{resumePreview}</p>
+          )}
+        </div>
+      )}
     </div>
   );
 };
