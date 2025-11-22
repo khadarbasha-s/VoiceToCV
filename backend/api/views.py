@@ -5,7 +5,7 @@ from django.http import JsonResponse, HttpResponse
 from rest_framework.decorators import api_view
 from rest_framework import status
 from agents.openai_tools import openai_refine_cv
-from utils.pdf_generator import generate_pdf_bytes, render_html
+from utils.pdf_generator import render_html
 from utils.docx_generator import generate_docx_bytes
 from utils.logger import logger
 from .models import CVSession
@@ -129,7 +129,6 @@ def generate_cv(request, session_id):
         logger.warning("OpenAI CV refinement failed: %s", exc)
         refinement_note = "Skipped AI refinement due to an error. Using collected details as-is."
 
-    pdf_base64 = None
     html_content = None
     docx_base64 = None
     notes = []
@@ -137,26 +136,14 @@ def generate_cv(request, session_id):
     if refinement_note:
         notes.append(refinement_note)
 
+    # Generate HTML preview
     try:
-        pdf_or_html_bytes = generate_pdf_bytes(refined_cv)
-        if isinstance(pdf_or_html_bytes, bytes):
-            try:
-                decoded_html = pdf_or_html_bytes.decode("utf-8")
-                if "<html" in decoded_html.lower() or "<!doctype" in decoded_html.lower():
-                    html_content = decoded_html
-                    notes.append("PDF generation not available - showing HTML preview instead.")
-                else:
-                    pdf_base64 = base64.b64encode(pdf_or_html_bytes).decode("utf-8")
-            except UnicodeDecodeError:
-                pdf_base64 = base64.b64encode(pdf_or_html_bytes).decode("utf-8")
-        elif isinstance(pdf_or_html_bytes, str):
-            html_content = pdf_or_html_bytes
-            notes.append("PDF generation not available - showing HTML preview instead.")
-    except Exception as exc:
-        logger.warning("PDF generation failed: %s", exc)
         html_content = render_html(refined_cv)
-        notes.append("PDF generation failed - showing HTML preview instead.")
+    except Exception as exc:
+        logger.warning("HTML generation failed: %s", exc)
+        notes.append("HTML preview generation failed.")
 
+    # Generate DOCX only
     try:
         docx_bytes = generate_docx_bytes(refined_cv)
         docx_base64 = base64.b64encode(docx_bytes).decode("utf-8")
@@ -164,10 +151,10 @@ def generate_cv(request, session_id):
         logger.warning("DOCX generation failed: %s", exc)
         notes.append("DOCX generation failed.")
 
-    if not any([pdf_base64, html_content, docx_base64]):
+    if not any([html_content, docx_base64]):
         return JsonResponse({"error": "Unable to generate resume files. Please try again later."}, status=500)
 
-    response_data = {"pdf_base64": pdf_base64, "docx_base64": docx_base64, "html_content": html_content}
+    response_data = {"docx_base64": docx_base64, "html_content": html_content}
     if notes:
         response_data["note"] = " ".join(notes)
 

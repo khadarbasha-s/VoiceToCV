@@ -51,7 +51,9 @@ def render_html(cv_json):
     template = env.get_template("cv_template.html")
 
     # Ensure structured data
-    cv_json["skills"] = _ensure_list(cv_json.get("skills"))
+    # Skills can be dict (categorized) or list (flat), so don't force to list
+    if cv_json.get("skills") and not isinstance(cv_json.get("skills"), (dict, list, str)):
+        cv_json["skills"] = _ensure_list(cv_json.get("skills"))
     cv_json["projects"] = _ensure_list(cv_json.get("projects"))
     cv_json["education"] = _ensure_list(cv_json.get("education"))
     cv_json["experience"] = _ensure_list(cv_json.get("experience"))
@@ -175,7 +177,20 @@ def generate_pdf_bytes(cv_json):
 
         # --- Skills ---
         story.append(Paragraph("Skills", section_style))
-        story.append(Paragraph(", ".join(cv_json["skills"]), body_style))
+        skills = cv_json.get("skills", [])
+        if isinstance(skills, dict):
+            # Categorized skills
+            for category, skills_list in skills.items():
+                if category != 'General' or (category == 'General' and skills_list):
+                    if skills_list:
+                        skills_str = skills_list if isinstance(skills_list, str) else ", ".join(str(s) for s in skills_list)
+                        p = Paragraph(f"<b>{category}:</b> {skills_str}", body_style)
+                        story.append(p)
+        elif isinstance(skills, list):
+            # Flat list
+            story.append(Paragraph(", ".join(str(s) for s in skills), body_style))
+        elif isinstance(skills, str):
+            story.append(Paragraph(skills, body_style))
         story.append(Spacer(1, 14))
 
         # --- Projects ---

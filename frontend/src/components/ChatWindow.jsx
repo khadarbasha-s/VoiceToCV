@@ -11,7 +11,7 @@ const ChatWindow = () => {
   const [sessionId, setSessionId] = useState(null);
   const [resumePreview, setResumePreview] = useState(null);
   const [resumePreviewType, setResumePreviewType] = useState(null);
-  const [resumeFiles, setResumeFiles] = useState({ pdf_base64: null, docx_base64: null });
+  const [resumeFiles, setResumeFiles] = useState({ docx_base64: null });
 
   // Create session on mount
   React.useEffect(() => {
@@ -61,31 +61,22 @@ const ChatWindow = () => {
     try {
       const res = await axios.get(`/generate-cv/${sessionId}/`);
       console.log("Resume response:", res.data);  // Log to inspect
-      const { pdf_base64, docx_base64, html_content, note } = res.data;
+      const { docx_base64, html_content, note } = res.data;
 
       // Store preview and file data for inline display and manual download
       if (html_content) {
         setResumePreview(html_content);
         setResumePreviewType("html");
-      } else if (pdf_base64) {
-        setResumePreview(pdf_base64);
-        setResumePreviewType("pdf");
-      } else if (docx_base64) {
-        setResumePreview("Preview is not available. Please use the buttons above to download your resume.");
-        setResumePreviewType("message");
       } else {
         setResumePreview(null);
         setResumePreviewType(null);
       }
 
-      setResumeFiles({ pdf_base64: pdf_base64 || null, docx_base64: docx_base64 || null });
+      setResumeFiles({ docx_base64: docx_base64 || null });
 
       const successMsg = {
         sender: "agent",
-        text: note || "Resume generated successfully! " +
-        (pdf_base64 ? "PDF and DOCX are ready to download." :
-         html_content ? "DOCX is ready to download and an HTML preview is available (PDF generation requires additional setup)." :
-         "DOCX is ready to download.")
+        text: note || "Resume generated successfully! DOCX is ready to download and an HTML preview is available."
       };
       setMessages((prev) => [...prev, successMsg]);
     } catch (error) {
@@ -129,28 +120,11 @@ const ChatWindow = () => {
         Generate Resume
       </button>
 
-      {(resumePreviewType || resumeFiles.pdf_base64 || resumeFiles.docx_base64) && (
+      {(resumePreviewType || resumeFiles.docx_base64) && (
         <div className="mt-4 border rounded-md p-3 bg-white max-h-[60vh] overflow-y-auto space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-lg">Resume Preview & Downloads</h2>
+            <h2 className="font-semibold text-lg">Resume Preview & Download</h2>
             <div className="space-x-2">
-              {resumeFiles.pdf_base64 && (
-                <button
-                  onClick={() => {
-                    const pdfBlob = new Blob([
-                      Uint8Array.from(atob(resumeFiles.pdf_base64), (c) => c.charCodeAt(0)),
-                    ], { type: 'application/pdf' });
-                    const pdfUrl = URL.createObjectURL(pdfBlob);
-                    const link = document.createElement('a');
-                    link.href = pdfUrl;
-                    link.download = 'resume.pdf';
-                    link.click();
-                  }}
-                  className="text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
-                >
-                  Download PDF
-                </button>
-              )}
               {resumeFiles.docx_base64 && (
                 <button
                   onClick={() => {
@@ -175,14 +149,6 @@ const ChatWindow = () => {
             <div
               className="prose max-w-none text-sm"
               dangerouslySetInnerHTML={{ __html: resumePreview }}
-            />
-          )}
-
-          {resumePreviewType === "pdf" && (
-            <iframe
-              title="Resume PDF Preview"
-              src={`data:application/pdf;base64,${resumePreview}`}
-              className="w-full h-[50vh] border"
             />
           )}
 

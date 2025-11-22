@@ -179,8 +179,11 @@ def generate_docx_bytes(cv_json):
         if isinstance(skills, dict):
             # Categorized skills
             for category, skills_list in skills.items():
+                # Skip empty General category
+                if category == 'General' and (not skills_list or len(skills_list) == 0):
+                    continue
                 if skills_list:
-                    skills_str = skills_list if isinstance(skills_list, str) else ", ".join(skills_list)
+                    skills_str = skills_list if isinstance(skills_list, str) else ", ".join(str(s) for s in skills_list)
                     p = doc.add_paragraph()
                     p.add_run(f"{category}: ").bold = True
                     p.add_run(skills_str)
