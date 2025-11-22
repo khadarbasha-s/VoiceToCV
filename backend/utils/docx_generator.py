@@ -30,14 +30,127 @@ def generate_docx_bytes(cv_json):
         personal = cv_json.get("personal_info", {})
         doc.add_heading(personal.get("name", ""), level=1)
 
-        contact = [
-            personal.get(field)
-            for field in ["email", "phone", "address"]
-            if personal.get(field)
-        ]
-        if contact:
-            doc.add_paragraph(" | ".join(contact))
+        # Contact information with social links
+        contact_parts = []
+        if personal.get("github"):
+            contact_parts.append(f"GitHub: {personal.get('github')}")
+        if personal.get("linkedin"):
+            contact_parts.append(f"LinkedIn: {personal.get('linkedin')}")
+        if personal.get("email"):
+            contact_parts.append(f"Email: {personal.get('email')}")
+        if personal.get("phone"):
+            contact_parts.append(f"Phone: {personal.get('phone')}")
+        if personal.get("address"):
+            contact_parts.append(f"Location: {personal.get('address')}")
+        if personal.get("portfolio"):
+            contact_parts.append(f"Portfolio: {personal.get('portfolio')}")
+        
+        if contact_parts:
+            doc.add_paragraph(" | ".join(contact_parts))
 
+        # Summary
+        summary_text = cv_json.get("summary")
+        if summary_text:
+            doc.add_heading("Summary", level=2)
+            doc.add_paragraph(summary_text)
+
+        # Current Role and Responsibilities (first experience)
+        experience = _ensure_list(cv_json.get("experience", []))
+        experience = [_normalize_entry(exp) for exp in experience]
+        
+        if experience:
+            doc.add_heading("Current Role and Responsibilities", level=2)
+            exp = experience[0]
+            if exp:
+                role = exp.get("role", "") or exp.get("description", "")
+                company = exp.get("company", "")
+                start_date = exp.get("start_date", "")
+                end_date = exp.get("end_date", "") or "Present"
+                
+                # Role and company header
+                p = doc.add_paragraph()
+                p.add_run(role).bold = True
+                p.add_run(f" at {company}")
+                
+                # Dates
+                doc.add_paragraph(f"{start_date} - {end_date}", style='Intense Quote')
+                
+                # Description with bullet points
+                description = exp.get("description", "")
+                if description and description != role:
+                    # Check if description has bullet points
+                    if '\n' in description or '•' in description or '-' in description[:20]:
+                        lines = description.split('\n')
+                        for line in lines:
+                            cleaned = line.strip().lstrip('•-*').strip()
+                            if cleaned:
+                                doc.add_paragraph(cleaned, style='List Bullet')
+                    else:
+                        doc.add_paragraph(description)
+
+        # Career Progression (remaining experiences)
+        if len(experience) > 1:
+            doc.add_heading("Career Progression", level=2)
+            for exp in experience[1:]:
+                if not exp:
+                    continue
+                role = exp.get("role", "") or exp.get("description", "")
+                company = exp.get("company", "")
+                start_date = exp.get("start_date", "")
+                end_date = exp.get("end_date", "") or "Present"
+                
+                # Role and company header
+                p = doc.add_paragraph()
+                p.add_run(role).bold = True
+                p.add_run(f" at {company}")
+                
+                # Dates
+                doc.add_paragraph(f"{start_date} - {end_date}", style='Intense Quote')
+                
+                # Description with bullet points
+                description = exp.get("description", "")
+                if description and description != role:
+                    if '\n' in description or '•' in description or '-' in description[:20]:
+                        lines = description.split('\n')
+                        for line in lines:
+                            cleaned = line.strip().lstrip('•-*').strip()
+                            if cleaned:
+                                doc.add_paragraph(cleaned, style='List Bullet')
+                    else:
+                        doc.add_paragraph(description)
+                
+                doc.add_paragraph()  # Space between entries
+
+        # Projects
+        doc.add_heading("Projects", level=2)
+        projects = _ensure_list(cv_json.get("projects", []))
+        projects = [_normalize_entry(proj) for proj in projects]
+        for proj in projects:
+            if not proj:
+                continue
+            name = proj.get("project_name", "") or proj.get("title", "") or proj.get("description", "")
+            description = proj.get("description", "")
+            technologies = proj.get("technologies", "")
+            
+            if name:
+                p = doc.add_paragraph()
+                p.add_run(name).bold = True
+                if technologies:
+                    p.add_run(f" - Technologies: {technologies}")
+            
+            if description and description != name:
+                if '\n' in description or '•' in description:
+                    lines = description.split('\n')
+                    for line in lines:
+                        cleaned = line.strip().lstrip('•-*').strip()
+                        if cleaned:
+                            doc.add_paragraph(cleaned, style='List Bullet')
+                else:
+                    doc.add_paragraph(description)
+            
+            doc.add_paragraph()  # Space between projects
+
+        # Education
         doc.add_heading("Education", level=2)
         education = _ensure_list(cv_json.get("education", []))
         education = [
@@ -50,50 +163,40 @@ def generate_docx_bytes(cv_json):
             institute = ed.get("institute", "")
             start_year = ed.get("start_year", "")
             end_year = ed.get("end_year", "")
-            line = f"{degree} - {institute} ({start_year} - {end_year})"
-            doc.add_paragraph(line.strip(" -()"))
+            gpa = ed.get("gpa", "") or ed.get("score", "")
+            
+            p = doc.add_paragraph()
+            p.add_run(degree).bold = True
+            p.add_run(f" - {institute}")
+            if start_year or end_year:
+                p.add_run(f" ({start_year} - {end_year})")
+            if gpa:
+                doc.add_paragraph(f"GPA: {gpa}", style='Intense Quote')
 
-        doc.add_heading("Experience", level=2)
-        experience = _ensure_list(cv_json.get("experience", []))
-        experience = [_normalize_entry(exp) for exp in experience]
-        for exp in experience:
-            if not exp:
-                continue
-            role = exp.get("role", "") or exp.get("description", "")
-            company = exp.get("company", "")
-            start_date = exp.get("start_date", "")
-            end_date = exp.get("end_date", "")
-            line = f"{role} at {company} ({start_date} - {end_date})"
-            doc.add_paragraph(line.strip(" -()"))
-            description = exp.get("description")
-            if description and description != role:
-                doc.add_paragraph(description)
-
+        # Skills
         doc.add_heading("Skills", level=2)
-        skills = _ensure_list(cv_json.get("skills", []))
-        flattened_skills = []
-        for skill in skills:
-            if isinstance(skill, str):
-                flattened_skills.append(skill)
-            elif isinstance(skill, dict):
-                flattened_skills.extend(
-                    v for v in skill.values() if isinstance(v, str)
-                )
-        if flattened_skills:
-            doc.add_paragraph(", ".join(flattened_skills))
-
-        doc.add_heading("Projects", level=2)
-        projects = _ensure_list(cv_json.get("projects", []))
-        projects = [_normalize_entry(proj) for proj in projects]
-        for proj in projects:
-            if not proj:
-                continue
-            name = proj.get("project_name", "") or proj.get("description", "")
-            description = proj.get("description", "")
-            line = name
-            if description and description != name:
-                line = f"{name} - {description}"
-            doc.add_paragraph(line)
+        skills = cv_json.get("skills", [])
+        if isinstance(skills, dict):
+            # Categorized skills
+            for category, skills_list in skills.items():
+                if skills_list:
+                    skills_str = skills_list if isinstance(skills_list, str) else ", ".join(skills_list)
+                    p = doc.add_paragraph()
+                    p.add_run(f"{category}: ").bold = True
+                    p.add_run(skills_str)
+        else:
+            # Flat list of skills
+            skills = _ensure_list(skills)
+            flattened_skills = []
+            for skill in skills:
+                if isinstance(skill, str):
+                    flattened_skills.append(skill)
+                elif isinstance(skill, dict):
+                    flattened_skills.extend(
+                        v for v in skill.values() if isinstance(v, str)
+                    )
+            if flattened_skills:
+                doc.add_paragraph(", ".join(flattened_skills))
 
         doc.add_heading("Certifications", level=2)
         certs = _ensure_list(cv_json.get("certifications", []))

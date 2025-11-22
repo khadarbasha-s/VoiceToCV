@@ -1,8 +1,13 @@
+import base64
 import os
 import tempfile
 from django.http import JsonResponse, HttpResponse
 from rest_framework.decorators import api_view
 from rest_framework import status
+from agents.openai_tools import openai_refine_cv
+from utils.pdf_generator import generate_pdf_bytes, render_html
+from utils.docx_generator import generate_docx_bytes
+from utils.logger import logger
 from .models import CVSession
 from .serializers import CVSessionSerializer
 from agents.voice_handler import transcribe_audio_file, speak_text
@@ -100,56 +105,71 @@ def generate_cv(request, session_id):
     except CVSession.DoesNotExist:
         return JsonResponse({"error": "session not found"}, status=404)
 
-    cv_json = session.cv_json
+    cv_json = session.cv_json or {}
 
     # Validate that we have minimum required data
     if not cv_json.get("personal_info", {}).get("name"):
         return JsonResponse({"error": "CV data is incomplete. Please provide at least your name."}, status=400)
 
-    # create HTML via template and then PDF & DOCX
-    from utils.pdf_generator import generate_pdf_bytes
-    from utils.docx_generator import generate_docx_bytes
+    target_language = (
+        cv_json.get("meta", {}).get("preferred_language")
+        if isinstance(cv_json.get("meta"), dict)
+        else None
+    ) or "auto"
+
+    refinement_note = None
+    try:
+        refinement = openai_refine_cv(cv_json, target_language=target_language)
+        refined_cv = refinement.get("cv_json", cv_json)
+        session.cv_json = refined_cv
+        session.cv_json.setdefault("meta", {})["refined"] = True
+        session.save(update_fields=["cv_json", "updated_at"])
+    except Exception as exc:
+        refined_cv = cv_json
+        logger.warning("OpenAI CV refinement failed: %s", exc)
+        refinement_note = "Skipped AI refinement due to an error. Using collected details as-is."
+
+    pdf_base64 = None
+    html_content = None
+    docx_base64 = None
+    notes = []
+
+    if refinement_note:
+        notes.append(refinement_note)
 
     try:
-        html_bytes = generate_pdf_bytes(cv_json)   # returns bytes of PDF
-    except Exception as e:
-        return JsonResponse({"error": f"PDF generation failed: {str(e)}"}, status=500)
+        pdf_or_html_bytes = generate_pdf_bytes(refined_cv)
+        if isinstance(pdf_or_html_bytes, bytes):
+            try:
+                decoded_html = pdf_or_html_bytes.decode("utf-8")
+                if "<html" in decoded_html.lower() or "<!doctype" in decoded_html.lower():
+                    html_content = decoded_html
+                    notes.append("PDF generation not available - showing HTML preview instead.")
+                else:
+                    pdf_base64 = base64.b64encode(pdf_or_html_bytes).decode("utf-8")
+            except UnicodeDecodeError:
+                pdf_base64 = base64.b64encode(pdf_or_html_bytes).decode("utf-8")
+        elif isinstance(pdf_or_html_bytes, str):
+            html_content = pdf_or_html_bytes
+            notes.append("PDF generation not available - showing HTML preview instead.")
+    except Exception as exc:
+        logger.warning("PDF generation failed: %s", exc)
+        html_content = render_html(refined_cv)
+        notes.append("PDF generation failed - showing HTML preview instead.")
 
     try:
-        docx_bytes = generate_docx_bytes(cv_json) # returns bytes of DOCX
-    except Exception as e:
-        return JsonResponse({"error": f"DOCX generation failed: {str(e)}"}, status=500)
+        docx_bytes = generate_docx_bytes(refined_cv)
+        docx_base64 = base64.b64encode(docx_bytes).decode("utf-8")
+    except Exception as exc:
+        logger.warning("DOCX generation failed: %s", exc)
+        notes.append("DOCX generation failed.")
 
-    # Check if we got PDF or HTML (fallback)
-    import base64
+    if not any([pdf_base64, html_content, docx_base64]):
+        return JsonResponse({"error": "Unable to generate resume files. Please try again later."}, status=500)
 
-    # First, let's see what type of data we got
-    try:
-        # Try to decode the bytes as text to see if it's HTML
-        try:
-            decoded_html = html_bytes.decode('utf-8')
-            # Check if it contains HTML tags
-            if '<html' in decoded_html.lower() or '<!doctype' in decoded_html.lower():
-                # This is HTML content
-                response_data = {
-                    "html_content": decoded_html,
-                    "docx_base64": base64.b64encode(docx_bytes).decode("utf-8"),
-                    "note": "PDF generation not available - showing HTML preview instead"
-                }
-            else:
-                # This is binary PDF data
-                response_data = {
-                    "pdf_base64": base64.b64encode(html_bytes).decode("utf-8"),
-                    "docx_base64": base64.b64encode(docx_bytes).decode("utf-8")
-                }
-        except UnicodeDecodeError:
-            # This is binary data (PDF), encode as base64
-            response_data = {
-                "pdf_base64": base64.b64encode(html_bytes).decode("utf-8"),
-                "docx_base64": base64.b64encode(docx_bytes).decode("utf-8")
-            }
-    except Exception as e:
-        return JsonResponse({"error": f"Error processing generated files: {str(e)}"}, status=500)
+    response_data = {"pdf_base64": pdf_base64, "docx_base64": docx_base64, "html_content": html_content}
+    if notes:
+        response_data["note"] = " ".join(notes)
 
     return JsonResponse(response_data)
 

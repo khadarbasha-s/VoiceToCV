@@ -1,8 +1,10 @@
 import json
 import copy
+import re
 from .openai_tools import openai_chat_completion
 from .memory_handler import get_conversation_for_agent
 from utils.logger import logger
+from utils.validators import validate_and_correct_personal_info, auto_correct_name
 
 
 class AgentCore:
@@ -13,7 +15,11 @@ class AgentCore:
                 "email": "",
                 "phone": "",
                 "address": "",
+                "github": "",
+                "linkedin": "",
+                "portfolio": "",
             },
+            "summary": "",
             "education": [],
             "experience": [],
             "skills": [],
@@ -24,6 +30,7 @@ class AgentCore:
                 "skip_certifications": False,
                 "projects_confirmed": False,
                 "project_detail_turns": 0,
+                "preferred_language": "auto",
             },
         }
 
@@ -83,7 +90,31 @@ class AgentCore:
             entry.setdefault("company", company.strip())
         return entry
 
+    def _extract_name_from_text(self, text):
+        """Heuristic extraction for name phrases in multiple languages."""
+        patterns = [
+            r"(?:na+\s*peru|naa\s*peru|nenu\s*peru)\s+(?P<name>[a-zA-Z\s\.]+)",
+            r"my\s+name\s+is\s+(?P<name>[a-zA-Z\s\.]+)",
+            r"name\s*[:\-]\s*(?P<name>[a-zA-Z\s\.]+)",
+        ]
+        lowered = text.lower()
+        for pattern in patterns:
+            match = re.search(pattern, lowered)
+            if match:
+                name_fragment = match.group("name").strip()
+                # Capture original casing by slicing original text using span from lowered version
+                span = match.span("name")
+                original_fragment = text[span[0]:span[1]].strip()
+                cleaned = re.sub(r"[^a-zA-Z\s\.]+", "", original_fragment).strip()
+                if cleaned:
+                    return cleaned
+        return ""
+
     def _merge_dict(self, base, incoming):
+        if not isinstance(base, dict):
+            base = {}
+        if not isinstance(incoming, dict):
+            return base
         merged = dict(base)
         for key, value in incoming.items():
             if isinstance(value, (list, dict)):
@@ -93,13 +124,27 @@ class AgentCore:
         return merged
 
     def _dedupe_strings(self, items):
+        """Deduplicate strings, handling both string items and dict items."""
         seen = {}
         for item in items:
             if not item:
                 continue
-            key = str(item).strip().lower()
-            if key and key not in seen:
-                seen[key] = item.strip()
+            # Handle dict items (categorized skills)
+            if isinstance(item, dict):
+                # For dicts, keep them as-is (they represent categorized skills)
+                key = str(sorted(item.items()))
+                if key not in seen:
+                    seen[key] = item
+            # Handle string items
+            elif isinstance(item, str):
+                key = item.strip().lower()
+                if key and key not in seen:
+                    seen[key] = item.strip()
+            else:
+                # For other types, convert to string
+                key = str(item).strip().lower()
+                if key and key not in seen:
+                    seen[key] = item
         return list(seen.values())
 
     def _normalize_cv_json(self, session, parsed_cv):
@@ -136,12 +181,25 @@ class AgentCore:
             if alias in incoming_personal and not incoming_personal.get(target):
                 incoming_personal[target] = incoming_personal[alias]
 
-        for field in personal_fields:
-            value = incoming_personal.get(field)
-            if value:
-                personal[field] = value
+        # Merge incoming personal info with existing
+        personal.update(incoming_personal)
+        
+        # Validate and correct personal information
+        corrected_personal = validate_and_correct_personal_info(personal)
+        existing["personal_info"] = corrected_personal
 
-        existing["personal_info"] = personal
+        # ---- SUMMARY ----
+        summary_value = existing.get("summary", "") or ""
+        incoming_summary = incoming.get("summary") or incoming.get("objective")
+        if isinstance(incoming_summary, (list, tuple)):
+            incoming_summary = " ".join(str(item).strip() for item in incoming_summary if item)
+        if isinstance(incoming_summary, dict):
+            incoming_summary = incoming_summary.get("text") or incoming_summary.get("value")
+        if isinstance(incoming_summary, str):
+            incoming_summary = incoming_summary.strip()
+        if incoming_summary:
+            summary_value = incoming_summary
+        existing["summary"] = summary_value
 
         # ---- META ----
         meta = existing.get("meta", {}) if isinstance(existing.get("meta"), dict) else {}
@@ -200,19 +258,71 @@ class AgentCore:
                 existing["meta"]["skip_experience"] = False
 
         # ---- SKILLS / PROJECTS / CERTIFICATIONS ----
+        alias_map = {
+            "projects": {"title": "project_name", "name": "project_name"},
+            "certifications": {
+                "certificate": "name",
+                "certification": "name",
+                "title": "name",
+                "org": "issuer",
+                "organization": "issuer",
+            },
+        }
+
         for section in ["skills", "projects", "certifications"]:
             incoming_list = self._ensure_list(incoming.get(section, []))
             if section == "skills":
-                combined = existing.get("skills", []) + incoming_list
-                existing["skills"] = self._dedupe_strings(combined)
-            else:
-                existing_list = self._ensure_list(existing.get(section, []))
-                for idx, new_item in enumerate(incoming_list):
-                    if idx < len(existing_list):
-                        existing_list[idx] = self._merge_dict(existing_list[idx], new_item)
+                # Handle skills - can be list of strings or dict (categorized)
+                existing_skills = existing.get("skills", [])
+                incoming_skills = incoming.get("skills", [])
+                
+                # If incoming is a dict (categorized), merge with existing dict
+                if isinstance(incoming_skills, dict):
+                    if isinstance(existing_skills, dict):
+                        # Merge categorized skills
+                        merged_skills = dict(existing_skills)
+                        for category, skills_list in incoming_skills.items():
+                            if category in merged_skills:
+                                # Combine lists and dedupe
+                                combined = self._ensure_list(merged_skills[category]) + self._ensure_list(skills_list)
+                                merged_skills[category] = self._dedupe_strings(combined)
+                            else:
+                                merged_skills[category] = self._ensure_list(skills_list)
+                        existing["skills"] = merged_skills
                     else:
-                        existing_list.append(new_item)
-                existing[section] = [i for i in existing_list if i]
+                        # Existing is list, incoming is dict - convert existing to dict or use incoming
+                        existing["skills"] = incoming_skills
+                elif isinstance(existing_skills, dict):
+                    # Existing is dict, incoming is list - try to merge into a default category
+                    if "General" not in existing_skills:
+                        existing_skills["General"] = []
+                    existing_skills["General"].extend(self._ensure_list(incoming_skills))
+                    existing_skills["General"] = self._dedupe_strings(existing_skills["General"])
+                    existing["skills"] = existing_skills
+                else:
+                    # Both are lists - combine and dedupe
+                    combined = self._ensure_list(existing_skills) + self._ensure_list(incoming_skills)
+                    existing["skills"] = self._dedupe_strings(combined)
+                continue
+
+            section_alias = alias_map.get(section, {})
+            normalized_existing = [
+                self._normalize_entry(item, section_alias)
+                for item in self._ensure_list(existing.get(section, []))
+            ]
+            normalized_incoming = [
+                self._normalize_entry(item, section_alias)
+                for item in incoming_list
+            ]
+
+            if normalized_incoming:
+                for idx, new_item in enumerate(normalized_incoming):
+                    if idx < len(normalized_existing):
+                        normalized_existing[idx] = self._merge_dict(normalized_existing[idx], new_item)
+                    else:
+                        normalized_existing.append(new_item)
+
+            existing[section] = [item for item in normalized_existing if item]
 
         return existing
 
@@ -280,6 +390,11 @@ class AgentCore:
         """Core interaction between agent and user."""
         messages = get_conversation_for_agent(session)
 
+        current_meta = {}
+        if isinstance(session.cv_json, dict):
+            current_meta = session.cv_json.get("meta", {}) or {}
+        preferred_language = current_meta.get("preferred_language")
+
         last_agent_prompt = ""
         for item in reversed(session.conversation):
             if item.get("from") == "agent":
@@ -311,6 +426,22 @@ class AgentCore:
             "dont have experiance",
         ]
         user_declined_experience = any(phrase in user_lower for phrase in no_experience_phrases)
+
+        telugu_negative_tokens = [
+            "ledu",
+            "ledhu",
+            "lādu",
+            "లేదు",
+            "లేడు",
+            "వద్దు",
+            "కావదు",
+            "కావలెదు",
+        ]
+
+        if not user_declined_experience:
+            has_telugu_negative = any(token in user_lower for token in telugu_negative_tokens)
+            if has_telugu_negative and any(keyword in user_lower for keyword in ["experience", "exper", "job", "work"]):
+                user_declined_experience = True
 
         if not user_declined_experience and "experienc" in user_lower:
             negative_tokens = ["no", "don't", "dont", "do not", "haven't", "havent", "never", "none"]
@@ -355,16 +486,27 @@ class AgentCore:
             if any(stripped_lower.startswith(reply) for reply in cert_negative_replies):
                 user_declined_certifications = True
 
+            if not user_declined_certifications and any(token in stripped_lower for token in telugu_negative_tokens):
+                user_declined_certifications = True
+
+        preferred_language_note = preferred_language or "auto"
+
         instruction = (
-            "Analyze the conversation and: "
-            "1) If the user is providing CV info, update the structured CV JSON using only these keys: "
-            "personal_info(name,email,phone,address), education(degree,institute,start_year,end_year), "
-            "experience(company,role,start_date,end_date,description), skills(list of strings), "
-            "projects(project_name,description,technologies), certifications(name,issuer,year). "
-            "2) Ask one follow-up question for the next missing field. "
-            "3) If unrelated to CV, answer briefly. "
-            "Respond strictly in JSON: {\"agent_text\":\"...\",\"cv_json\":{...},\"next_action\":\"ask|answer|complete\"}."
-        )
+            "You are a helpful CV-building assistant. Follow these rules:\n"
+            "1) If the user provides CV information, update the structured CV JSON using only these keys: "
+            "personal_info(name,email,phone,address,github,linkedin,portfolio), education(degree,institute,start_year,end_year,gpa), "
+            "experience(company,role,start_date,end_date,description), summary(text), skills(list of strings or categorized object), "
+            "projects(project_name,description,technologies,date), certifications(name,issuer,year).\n"
+            "2) For experience descriptions, format as bullet points separated by newlines (\\n) when user provides multiple points.\n"
+            "3) For skills, if user mentions categories (like 'Programming Languages', 'Frameworks'), structure as object with categories as keys.\n"
+            "4) Ask exactly one follow-up question for the next missing field unless the CV is complete.\n"
+            "5) If the user request is unrelated to CV building, answer briefly and set next_action to \"answer\".\n"
+            "6) Detect the user's language (ISO 639-1). Use '{preferred_language_note}' as the preferred language if it is not 'auto'; otherwise mirror the user's language.\n"
+            "7) Provide the assistant reply (agent_text) in that language.\n"
+            "8) ALWAYS update cv_json with any new information the user provides, even if the answer is in another language.\n"
+            "9) For social links (GitHub, LinkedIn), extract username or full URL from user input.\n"
+            "Respond strictly in JSON: {{\"agent_text\":\"...\",\"cv_json\":{{...}},\"next_action\":\"ask|answer|complete\",\"language\":\"<iso>\"}}."
+        ).format(preferred_language_note=preferred_language_note)
         messages.append({"role": "user", "content": instruction + f"\n\nUser said: {user_text}"})
 
         try:
@@ -379,6 +521,23 @@ class AgentCore:
 
         normalized_cv = self._normalize_cv_json(session, parsed.get("cv_json", session.cv_json))
         meta = normalized_cv.setdefault("meta", {})
+
+        parsed_language = parsed.get("language")
+        if isinstance(parsed_language, str) and parsed_language.strip():
+            meta["preferred_language"] = parsed_language.strip().lower()
+        else:
+            meta.setdefault("preferred_language", preferred_language or "auto")
+
+        meta.setdefault("refined", False)
+
+        personal_info = normalized_cv.setdefault("personal_info", {})
+        if not personal_info.get("name"):
+            extracted_name = self._extract_name_from_text(user_text)
+            if extracted_name:
+                personal_info["name"] = auto_correct_name(extracted_name)
+        elif personal_info.get("name"):
+            # Auto-correct existing name
+            personal_info["name"] = auto_correct_name(personal_info["name"])
 
         if user_declined_experience:
             meta["skip_experience"] = True
@@ -412,6 +571,16 @@ class AgentCore:
                 meta["projects_confirmed"] = True
         else:
             meta.setdefault("project_detail_turns", meta.get("project_detail_turns", 0))
+
+        if not meta.get("projects_confirmed"):
+            detailed_projects = [
+                proj
+                for proj in normalized_cv.get("projects", [])
+                if isinstance(proj, dict)
+                and len((proj.get("description") or "").split()) >= 6
+            ]
+            if detailed_projects:
+                meta["projects_confirmed"] = True
 
         if meta.get("project_detail_turns", 0) >= 2:
             meta["projects_confirmed"] = True
