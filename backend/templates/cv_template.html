@@ -77,10 +77,16 @@
 
         {% if ex.description %}
         <ul class="list-disc ml-6 space-y-1 text-gray-700">
-          {% for line in ex.description.split('
+          {% set desc_lines = ex.description.split('
 ') %}
-            {% if line.strip() %}
-            <li>{{ line.strip() }}</li>
+          {% for line in desc_lines %}
+            {% set cleaned = line.strip() %}
+            {% if cleaned %}
+              {# Remove numbered prefixes like "1.", "2.", etc. #}
+              {% if cleaned[0:2]|int(0) > 0 and cleaned[2:3] in ['.', ')', '-'] %}
+                {% set cleaned = cleaned[2:].lstrip('.)- ').strip() %}
+              {% endif %}
+              <li>{{ cleaned }}</li>
             {% endif %}
           {% endfor %}
         </ul>

@@ -1,3 +1,4 @@
+import re
 from docx import Document
 import io
 
@@ -78,11 +79,15 @@ def generate_docx_bytes(cv_json):
                 # Description with bullet points
                 description = exp.get("description", "")
                 if description and description != role:
-                    # Check if description has bullet points
-                    if '\n' in description or '•' in description or '-' in description[:20]:
+                    # Check if description has bullet points or numbered list
+                    if '\n' in description or '•' in description or '-' in description[:20] or re.match(r'^\d+[.)-]', description.strip()):
                         lines = description.split('\n')
                         for line in lines:
-                            cleaned = line.strip().lstrip('•-*').strip()
+                            cleaned = line.strip()
+                            # Remove numbered prefixes like "1.", "2.", "1)", etc.
+                            if re.match(r'^\d+[.)-]\s*', cleaned):
+                                cleaned = re.sub(r'^\d+[.)-]\s*', '', cleaned)
+                            cleaned = cleaned.lstrip('•-*').strip()
                             if cleaned:
                                 doc.add_paragraph(cleaned, style='List Bullet')
                     else:
@@ -110,10 +115,15 @@ def generate_docx_bytes(cv_json):
                 # Description with bullet points
                 description = exp.get("description", "")
                 if description and description != role:
-                    if '\n' in description or '•' in description or '-' in description[:20]:
+                    # Check if description has bullet points or numbered list
+                    if '\n' in description or '•' in description or '-' in description[:20] or re.match(r'^\d+[.)-]', description.strip()):
                         lines = description.split('\n')
                         for line in lines:
-                            cleaned = line.strip().lstrip('•-*').strip()
+                            cleaned = line.strip()
+                            # Remove numbered prefixes like "1.", "2.", "1)", etc.
+                            if re.match(r'^\d+[.)-]\s*', cleaned):
+                                cleaned = re.sub(r'^\d+[.)-]\s*', '', cleaned)
+                            cleaned = cleaned.lstrip('•-*').strip()
                             if cleaned:
                                 doc.add_paragraph(cleaned, style='List Bullet')
                     else:

@@ -81,13 +81,67 @@ class AgentCore:
         """Extract role/company from description if missing."""
         if entry.get("role") and entry.get("company"):
             return entry
-        description = entry.get("description", "")
-        if not description:
-            return entry
-        if " at " in description:
-            role, company = description.split(" at ", 1)
-            entry.setdefault("role", role.strip())
-            entry.setdefault("company", company.strip())
+        
+        # Normalize keys (handle case variations)
+        key_map = {
+            "company": "company",
+            "organization": "company",
+            "employer": "company",
+            "role": "role",
+            "position": "role",
+            "title": "role",
+            "job_title": "role",
+            "start_date": "start_date",
+            "start": "start_date",
+            "from": "start_date",
+            "end_date": "end_date",
+            "end": "end_date",
+            "to": "end_date",
+            "until": "end_date",
+            "till": "end_date",
+            "description": "description",
+            "responsibilities": "description",
+            "duties": "description",
+        }
+        
+        # Normalize all keys to lowercase and map aliases
+        normalized = {}
+        for k, v in entry.items():
+            k_lower = k.lower()
+            target_key = key_map.get(k_lower, k_lower)
+            if v not in (None, ""):
+                normalized[target_key] = v
+        
+        entry.update(normalized)
+        
+        # If still missing role/company, try to extract from description
+        if not (entry.get("role") and entry.get("company")):
+            description = entry.get("description", "")
+            if description:
+                # Try " at " pattern: "Role at Company"
+                if " at " in description:
+                    parts = description.split(" at ", 1)
+                    if not entry.get("role"):
+                        entry["role"] = parts[0].strip()
+                    if not entry.get("company") and len(parts) > 1:
+                        entry["company"] = parts[1].split(",")[0].strip()
+                # Try comma-separated: "Company, Role"
+                elif "," in description and not entry.get("company"):
+                    parts = description.split(",", 2)
+                    if len(parts) >= 2:
+                        entry["company"] = parts[0].strip()
+                        if "role" in parts[1].lower() or "position" in parts[1].lower():
+                            role_part = parts[1]
+                            if "–" in role_part or "-" in role_part:
+                                role_part = role_part.split("–")[-1].split("-")[-1]
+                            entry["role"] = role_part.replace("Role", "").replace("role", "").strip(" –-")
+        
+        # Normalize date formats
+        if entry.get("end_date"):
+            end_date = str(entry["end_date"]).lower()
+            if any(phrase in end_date for phrase in ["till date", "till now", "present", "current", "ongoing"]):
+                entry["end_date"] = "Present"
+        
         return entry
 
     def _extract_name_from_text(self, text):
@@ -237,12 +291,32 @@ class AgentCore:
         existing["education"] = [ed for ed in existing_edu if ed]
 
         # ---- EXPERIENCE ----
+        experience_key_map = {
+            "company": "company",
+            "organization": "company",
+            "employer": "company",
+            "role": "role",
+            "position": "role",
+            "title": "role",
+            "job_title": "role",
+            "start_date": "start_date",
+            "start": "start_date",
+            "from": "start_date",
+            "end_date": "end_date",
+            "end": "end_date",
+            "to": "end_date",
+            "until": "end_date",
+            "till": "end_date",
+            "description": "description",
+            "responsibilities": "description",
+            "duties": "description",
+        }
         existing_exp = [
-            self._parse_experience_description(self._normalize_entry(exp))
+            self._parse_experience_description(self._normalize_entry(exp, experience_key_map))
             for exp in self._ensure_list(existing.get("experience", []))
         ]
         incoming_exp = [
-            self._parse_experience_description(self._normalize_entry(exp))
+            self._parse_experience_description(self._normalize_entry(exp, experience_key_map))
             for exp in self._ensure_list(incoming.get("experience", []))
         ]
         if incoming_exp:
