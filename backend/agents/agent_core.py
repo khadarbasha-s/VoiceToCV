@@ -725,7 +725,8 @@ class AgentCore:
             else:
                 agent_text = completion_prompt
                 next_action = "complete"
-        elif not agent_text:
+        elif not agent_text or next_question:
+            # Always prioritize next_question if it exists to ensure all required fields are asked
             if next_question:
                 agent_text = next_question
                 next_action = "ask"
