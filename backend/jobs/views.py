@@ -110,6 +110,9 @@ def search_jobs(request):
     Search and filter jobs
     Query params: keyword, location, job_type, experience_level, remote, salary_min
     """
+    import logging
+    logger = logging.getLogger(__name__)
+
     jobs = Job.objects.filter(is_active=True)
     
     # Filters
@@ -149,7 +152,18 @@ def search_jobs(request):
     
     total = jobs.count()
     jobs = jobs.order_by('-created_at')[start:end]
-    
+
+    logger.info(
+        "search_jobs filters keyword=%s location=%s job_type=%s experience=%s remote=%s salary_min=%s total=%s",
+        keyword,
+        location,
+        job_type,
+        experience_level,
+        remote,
+        salary_min,
+        total,
+    )
+
     serializer = JobListSerializer(jobs, many=True, context={'request': request})
     
     return Response({
@@ -417,8 +431,7 @@ def create_job(request):
             recruiter = Recruiter.objects.create(
                 user=default_user,
                 company_name='TalentPath',
-                contact_email='recruiter@talentpath.com',
-                contact_phone='0000000000'
+                phone='0000000000'
             )
             logger.info(f"Created default recruiter: {recruiter.company_name}")
         

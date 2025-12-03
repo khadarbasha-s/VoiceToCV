@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from .views_livekit import get_livekit_token
 
 urlpatterns = [
     path("session/create/", views.create_session, name="create_session"),
@@ -8,4 +9,5 @@ urlpatterns = [
     path("generate-cv/<str:session_id>/", views.generate_cv, name="generate_cv"),
     path("session/<str:session_id>/", views.get_session, name="get_session"),
     path("chat/", views.chat, name="chat"),
+    path("livekit/token/", get_livekit_token, name="livekit_token"),
 ]
