@@ -65,30 +65,33 @@ const TalentPathLayout = ({ children }) => {
             </Link>
 
             {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center gap-6">
+            <div className="hidden md:flex items-center space-x-8">
               <Link
                 to="/talentpath/dashboard"
-                className="hover:text-teal-300 transition-colors font-medium"
+                className={`text-sm font-medium transition-colors ${location.pathname === '/talentpath/dashboard'
+                  ? 'text-blue-600'
+                  : 'text-gray-700 hover:text-blue-600'
+                  }`}
               >
                 Dashboard
               </Link>
               <Link
                 to="/talentpath/jobs"
-                className="hover:text-teal-300 transition-colors font-medium"
+                className={`text-sm font-medium transition-colors ${location.pathname === '/talentpath/jobs'
+                  ? 'text-blue-600'
+                  : 'text-gray-700 hover:text-blue-600'
+                  }`}
               >
-                Find Jobs
+                Jobs
               </Link>
               <Link
-                to="/talentpath/applications"
-                className="hover:text-teal-300 transition-colors font-medium"
+                to="/home"
+                className={`text-sm font-medium transition-colors ${location.pathname === '/home'
+                    ? 'text-blue-600'
+                    : 'text-gray-700 hover:text-blue-600'
+                  }`}
               >
-                Applications
-              </Link>
-              <Link
-                to="/talentpath/saved"
-                className="hover:text-teal-300 transition-colors font-medium"
-              >
-                Saved
+                Create CV
               </Link>
               <Link
                 to="/recruiter/jobs/create"
