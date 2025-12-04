@@ -22,6 +22,9 @@ const Dashboard = () => {
   const [recommendations, setRecommendations] = useState([]);
   const [profile, setProfile] = useState(null);
   const [activeTab, setActiveTab] = useState('profile'); // profile, youMightLike, preferences
+  const [applyingJobId, setApplyingJobId] = useState(null);
+  const [diversityResponse, setDiversityResponse] = useState(null);
+  const [diversityMessage, setDiversityMessage] = useState('');
   const [stats, setStats] = useState({
     applications_count: 0,
     saved_jobs_count: 0,
@@ -33,6 +36,16 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchDashboardData();
+
+    const storedPreference = localStorage.getItem('talentpath_diversity_preference');
+    if (storedPreference) {
+      setDiversityResponse(storedPreference);
+      setDiversityMessage(
+        storedPreference === 'has_disability'
+          ? "Thanks for sharing your status. We'll factor this into future recommendations."
+          : "Thanks for letting us know. We'll keep tailoring opportunities."
+      );
+    }
   }, []);
 
   const fetchDashboardData = async () => {
@@ -62,20 +75,32 @@ const Dashboard = () => {
         }
       }
       
+      const token = localStorage.getItem('token');
+      const authHeaders = {
+        'Content-Type': 'application/json'
+      };
+      if (token) {
+        authHeaders['Authorization'] = `Bearer ${token}`;
+      }
+
       // Fetch real jobs from backend
       try {
         const jobsResponse = await fetch('http://127.0.0.1:8000/api/talentpath/jobs/', {
-          headers: {
-            'Content-Type': 'application/json'
-          }
+          headers: authHeaders
         });
         
         if (jobsResponse.ok) {
           const jobsData = await jobsResponse.json();
           console.log('Fetched jobs:', jobsData);
-          
+
+          const jobsList = Array.isArray(jobsData)
+            ? jobsData
+            : Array.isArray(jobsData.results)
+              ? jobsData.results
+              : [];
+
           // Format jobs for display
-          const formattedJobs = jobsData.map(job => ({
+          const formattedJobs = jobsList.map(job => ({
             job_id: job.job_id,
             title: job.title,
             company_name: job.company_name,
@@ -90,6 +115,8 @@ const Dashboard = () => {
             company_rating: 4.0, // Default rating
             description: job.description,
             created_at: formatDate(job.created_at),
+            has_applied: job.has_applied,
+            is_saved: job.is_saved,
             match_score: 85 // Default match score (can be calculated later)
           }));
           
@@ -106,9 +133,7 @@ const Dashboard = () => {
       // Fetch user stats
       try {
         const statsResponse = await fetch('http://127.0.0.1:8000/api/talentpath/dashboard/user/', {
-          headers: {
-            'Content-Type': 'application/json'
-          }
+          headers: authHeaders
         });
         
         if (statsResponse.ok) {
@@ -140,6 +165,60 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleApplyToJob = async (jobId) => {
+    const token = localStorage.getItem('token');
+
+    if (!token) {
+      alert('Please log in to apply for jobs.');
+      return;
+    }
+
+    try {
+      setApplyingJobId(jobId);
+      const response = await fetch(`http://127.0.0.1:8000/api/talentpath/jobs/${jobId}/apply/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ cover_letter: '' })
+      });
+
+      if (response.ok) {
+        alert('Application submitted successfully!');
+        setRecommendations(prev =>
+          prev.map(job =>
+            job.job_id === jobId
+              ? { ...job, has_applied: true }
+              : job
+          )
+        );
+        setStats(prev => ({
+          ...prev,
+          applications_count: (prev.applications_count || 0) + 1
+        }));
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        alert(errorData.error || 'Failed to submit application');
+      }
+    } catch (error) {
+      console.error('Error applying to job:', error);
+      alert('Failed to submit application');
+    } finally {
+      setApplyingJobId(null);
+    }
+  };
+
+  const handleDiversitySelection = (selection) => {
+    setDiversityResponse(selection);
+    const message =
+      selection === 'has_disability'
+        ? "Thanks for sharing your status. We'll factor this into future recommendations."
+        : "Thanks for letting us know. We'll keep tailoring opportunities.";
+    setDiversityMessage(message);
+    localStorage.setItem('talentpath_diversity_preference', selection);
   };
 
   const formatDate = (dateString) => {
@@ -358,17 +437,37 @@ const Dashboard = () => {
                     Companies want to build inclusive teams, help us identify your disability status for better jobs.
                   </h3>
                   <div className="flex gap-3 mt-3">
-                    <button className="px-4 py-2 border border-gray-300 rounded-full text-sm font-medium text-gray-700 hover:bg-gray-50">
+                    <button
+                      type="button"
+                      onClick={() => handleDiversitySelection('has_disability')}
+                      aria-pressed={diversityResponse === 'has_disability'}
+                      className={`px-4 py-2 border rounded-full text-sm font-medium transition-colors ${
+                        diversityResponse === 'has_disability'
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
                       I have a disability
                     </button>
-                    <button className="px-4 py-2 border border-gray-300 rounded-full text-sm font-medium text-gray-700 hover:bg-gray-50">
+                    <button
+                      type="button"
+                      onClick={() => handleDiversitySelection('no_disability')}
+                      aria-pressed={diversityResponse === 'no_disability'}
+                      className={`px-4 py-2 border rounded-full text-sm font-medium transition-colors ${
+                        diversityResponse === 'no_disability'
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
                       I don't have a disability
                     </button>
                   </div>
+                  {diversityMessage && (
+                    <p className="mt-4 text-sm text-teal-700 font-medium">
+                      {diversityMessage}
+                    </p>
+                  )}
                 </div>
-                <button className="ml-4 px-6 py-2 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 text-sm">
-                  Submit
-                </button>
               </div>
             </div>
 
@@ -498,16 +597,40 @@ const Dashboard = () => {
                           </div>
                         </div>
 
-                        {/* Save Button */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            // Handle save
-                          }}
-                          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                        >
-                          <BookmarkIcon className="w-5 h-5 text-gray-400 hover:text-blue-600" />
-                        </button>
+                        <div className="flex flex-col items-end gap-3">
+                          {!job.has_applied ? (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleApplyToJob(job.job_id);
+                              }}
+                              disabled={applyingJobId === job.job_id}
+                              className={`px-4 py-2 rounded-lg font-semibold text-white transition-colors ${
+                                applyingJobId === job.job_id
+                                  ? 'bg-gray-400 cursor-not-allowed'
+                                  : 'bg-teal-500 hover:bg-teal-600'
+                              }`}
+                            >
+                              {applyingJobId === job.job_id ? 'Applying...' : 'Apply Now'}
+                            </button>
+                          ) : (
+                            <span className="inline-flex items-center px-3 py-1 rounded-lg text-sm font-semibold bg-green-100 text-green-800">
+                              ✓ Applied
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              // Handle save
+                            }}
+                            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                            title={job.is_saved ? 'Saved job' : 'Save job'}
+                          >
+                            <BookmarkIcon className={`w-5 h-5 ${job.is_saved ? 'text-blue-600' : 'text-gray-400 hover:text-blue-600'}`} />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))

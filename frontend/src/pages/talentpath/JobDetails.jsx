@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { MapPinIcon, BriefcaseIcon, ClockIcon, CurrencyDollarIcon, BuildingOfficeIcon } from '@heroicons/react/24/outline';
 import ApplyButton from '../../components/talentpath/ApplyButton';
 import SkillsChip from '../../components/talentpath/SkillsChip';
@@ -12,6 +12,7 @@ import JobCard from '../../components/talentpath/JobCard';
 const JobDetails = () => {
   const { jobId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [job, setJob] = useState(null);
   const [similarJobs, setSimilarJobs] = useState([]);
@@ -36,14 +37,14 @@ const JobDetails = () => {
       if (response.ok) {
         const data = await response.json();
         setJob(data);
-        
+
         // Try to get match score from recommendations
         const recsResponse = await fetch('/api/talentpath/jobs/recommended/', {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
           }
         });
-        
+
         if (recsResponse.ok) {
           const recsData = await recsResponse.json();
           const recommendation = recsData.find(r => r.job.job_id === jobId);
@@ -77,6 +78,12 @@ const JobDetails = () => {
   };
 
   const handleApply = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      navigate('/login', { state: { from: location } });
+      return;
+    }
+
     try {
       const response = await fetch(`/api/talentpath/jobs/${jobId}/apply/`, {
         method: 'POST',
@@ -346,7 +353,7 @@ const JobDetails = () => {
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg max-w-2xl w-full p-8">
               <h2 className="text-2xl font-bold text-gray-900 mb-4">Apply for {job.title}</h2>
-              
+
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Cover Letter (Optional)
