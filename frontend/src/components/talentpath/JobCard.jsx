@@ -11,7 +11,7 @@ const JobCard = ({ job, onSave, onUnsave, matchScore }) => {
   const navigate = useNavigate();
 
   const handleCardClick = () => {
-    navigate(`/jobs/${job.job_id}`);
+    navigate(`/talentpath/jobs/${job.job_id}`);
   };
 
   const handleSaveClick = (e) => {

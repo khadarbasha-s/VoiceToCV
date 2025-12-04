@@ -5,6 +5,9 @@ openai
 langchain
 faster-whisper
 pyttsx3
+livekit-api
+channels
+daphne
 jinja2
 weasyprint
 python-docx

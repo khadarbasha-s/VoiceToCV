@@ -18,9 +18,12 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
+    "rest_framework.authtoken",
     "corsheaders",
+    "channels",
     "api",
     "jobs",
+    "accounts",
 ]
 
 MIDDLEWARE = [
@@ -52,6 +55,12 @@ TEMPLATES = [
 WSGI_APPLICATION = "voice_to_cv.wsgi.application"
 ASGI_APPLICATION = "voice_to_cv.asgi.application"
 
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer",
+    }
+}
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
@@ -79,3 +88,19 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",  # Adjust to your frontend port
     "http://127.0.0.1:3000",
 ]
+
+# LiveKit configuration
+LIVEKIT_WS_URL = os.getenv("LIVEKIT_WS_URL", "ws://localhost:7880")
+LIVEKIT_API_KEY = os.getenv("LIVEKIT_API_KEY", "devkey")
+LIVEKIT_API_SECRET = os.getenv("LIVEKIT_API_SECRET", "secret")
+
+# REST Framework settings
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticatedOrReadOnly',
+    ],
+}

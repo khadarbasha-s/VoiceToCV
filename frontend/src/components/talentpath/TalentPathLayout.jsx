@@ -1,15 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { 
-  HomeIcon, 
-  MagnifyingGlassIcon, 
-  BriefcaseIcon, 
+import {
+  HomeIcon,
+  MagnifyingGlassIcon,
+  BriefcaseIcon,
   BookmarkIcon,
   UserIcon,
   BellIcon,
   ArrowLeftOnRectangleIcon,
   PlusIcon
 } from '@heroicons/react/24/outline';
+import authService from '../../services/auth';
 
 /**
  * TalentPathLayout - Main layout for TalentPath portal
@@ -32,9 +33,7 @@ const TalentPathLayout = ({ children }) => {
   const isActive = (path) => location.pathname === path;
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('currentCV');
-    localStorage.removeItem('currentCVDocx');
+    authService.logout();
     navigate('/');
   };
 
@@ -58,40 +57,41 @@ const TalentPathLayout = ({ children }) => {
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <Link to="/talentpath/dashboard" className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-teal-500 flex items-center justify-center font-bold text-xl">
-                T
-              </div>
+              <img src="/logo.png" alt="AVASAR Logo" className="w-10 h-10 rounded-lg" />
               <div>
-                <h1 className="text-xl font-bold">TalentPath</h1>
+                <h1 className="text-xl font-bold">AVASAR</h1>
                 <p className="text-xs text-blue-100">Find Your Perfect Job</p>
               </div>
             </Link>
 
             {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center gap-6">
+            <div className="hidden md:flex items-center space-x-8">
               <Link
                 to="/talentpath/dashboard"
-                className="hover:text-teal-300 transition-colors font-medium"
+                className={`text-sm font-medium transition-colors ${location.pathname === '/talentpath/dashboard'
+                  ? 'text-blue-600'
+                  : 'text-gray-700 hover:text-blue-600'
+                  }`}
               >
                 Dashboard
               </Link>
               <Link
                 to="/talentpath/jobs"
-                className="hover:text-teal-300 transition-colors font-medium"
+                className={`text-sm font-medium transition-colors ${location.pathname === '/talentpath/jobs'
+                  ? 'text-blue-600'
+                  : 'text-gray-700 hover:text-blue-600'
+                  }`}
               >
-                Find Jobs
+                Jobs
               </Link>
               <Link
-                to="/talentpath/applications"
-                className="hover:text-teal-300 transition-colors font-medium"
+                to="/home"
+                className={`text-sm font-medium transition-colors ${location.pathname === '/home'
+                    ? 'text-blue-600'
+                    : 'text-gray-700 hover:text-blue-600'
+                  }`}
               >
-                Applications
-              </Link>
-              <Link
-                to="/talentpath/saved"
-                className="hover:text-teal-300 transition-colors font-medium"
-              >
-                Saved
+                Create CV
               </Link>
               <Link
                 to="/recruiter/jobs/create"
@@ -120,7 +120,7 @@ const TalentPathLayout = ({ children }) => {
                   </div>
                   <span className="font-medium">Profile</span>
                 </button>
-                
+
                 {/* Dropdown Menu - Click Based */}
                 {isProfileOpen && (
                   <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50">
@@ -164,59 +164,54 @@ const TalentPathLayout = ({ children }) => {
         <div className="grid grid-cols-4 gap-1">
           <Link
             to="/talentpath/dashboard"
-            className={`flex flex-col items-center justify-center py-3 ${
-              isActive('/talentpath/dashboard')
-                ? 'text-blue-600 font-semibold'
-                : 'text-gray-600'
-            }`}
+            className={`flex flex-col items-center justify-center py-3 ${isActive('/talentpath/dashboard')
+              ? 'text-blue-600 font-semibold'
+              : 'text-gray-600'
+              }`}
           >
             <HomeIcon className="w-6 h-6" />
             <span className="text-xs mt-1">Home</span>
           </Link>
-          
+
           <Link
             to="/talentpath/jobs"
-            className={`flex flex-col items-center justify-center py-3 ${
-              isActive('/talentpath/jobs')
-                ? 'text-blue-600 font-semibold'
-                : 'text-gray-600'
-            }`}
+            className={`flex flex-col items-center justify-center py-3 ${isActive('/talentpath/jobs')
+              ? 'text-blue-600 font-semibold'
+              : 'text-gray-600'
+              }`}
           >
             <MagnifyingGlassIcon className="w-6 h-6" />
             <span className="text-xs mt-1">Jobs</span>
           </Link>
-          
+
           <Link
             to="/talentpath/applications"
-            className={`flex flex-col items-center justify-center py-3 ${
-              isActive('/talentpath/applications')
-                ? 'text-blue-600 font-semibold'
-                : 'text-gray-600'
-            }`}
+            className={`flex flex-col items-center justify-center py-3 ${isActive('/talentpath/applications')
+              ? 'text-blue-600 font-semibold'
+              : 'text-gray-600'
+              }`}
           >
             <BriefcaseIcon className="w-6 h-6" />
             <span className="text-xs mt-1">Apps</span>
           </Link>
-          
+
           <Link
             to="/talentpath/notifications"
-            className={`flex flex-col items-center justify-center py-3 ${
-              isActive('/talentpath/notifications')
-                ? 'text-blue-600 font-semibold'
-                : 'text-gray-600'
-            }`}
+            className={`flex flex-col items-center justify-center py-3 ${isActive('/talentpath/notifications')
+              ? 'text-blue-600 font-semibold'
+              : 'text-gray-600'
+              }`}
           >
             <BellIcon className="w-6 h-6" />
             <span className="text-xs mt-1">Alerts</span>
           </Link>
-          
+
           <Link
             to="/talentpath/profile"
-            className={`flex flex-col items-center justify-center py-3 ${
-              isActive('/talentpath/profile')
-                ? 'text-blue-600 font-semibold'
-                : 'text-gray-600'
-            }`}
+            className={`flex flex-col items-center justify-center py-3 ${isActive('/talentpath/profile')
+              ? 'text-blue-600 font-semibold'
+              : 'text-gray-600'
+              }`}
           >
             <UserIcon className="w-6 h-6" />
             <span className="text-xs mt-1">Profile</span>

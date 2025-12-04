@@ -442,7 +442,17 @@ class AgentCore:
             if not exp.get("description"):
                 return "Could you briefly describe your responsibilities in that role?"
 
-        if not cv_json.get("skills"):
+
+        skills = cv_json.get("skills")
+        # Check if skills is truly empty (empty list, empty dict, or None)
+        has_skills = False
+        if skills:
+            if isinstance(skills, dict):
+                has_skills = any(skills.values())  # Check if any category has skills
+            elif isinstance(skills, list):
+                has_skills = len(skills) > 0
+        
+        if not has_skills:
             return "Could you share some of your key skills?"
         if not cv_json.get("projects"):
             return "Would you like to add a project? Please include the project name and a short description."

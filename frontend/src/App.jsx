@@ -17,16 +17,23 @@ import Notifications from "./pages/talentpath/Notifications";
 // Recruiter Pages
 import RecruiterDashboard from "./pages/recruiter/RecruiterDashboard";
 import PostJob from "./pages/recruiter/PostJob";
+import Login from "./pages/Login";
+import Signup from "./pages/Signup";
+import LandingPage from "./pages/LandingPage";
 
 function App() {
   return (
     <Router>
       <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
         {/* Main VoiceToCV Routes */}
-        <Route path="/" element={
+        <Route path="/" element={<LandingPage />} />
+
+        <Route path="/home" element={
           <div className="min-h-screen flex flex-col">
             <nav className="bg-blue-600 text-white p-4 flex justify-between items-center">
-              <h1 className="text-xl font-semibold">VoiceToCV</h1>
+              <h1 className="text-xl font-semibold">AVASAR</h1>
               <div className="space-x-4">
                 <Link to="/">Home</Link>
                 <Link to="/about">About</Link>
@@ -40,7 +47,7 @@ function App() {
             </main>
           </div>
         } />
-        
+
         <Route path="/about" element={
           <div className="min-h-screen flex flex-col">
             <nav className="bg-blue-600 text-white p-4 flex justify-between items-center">
@@ -65,37 +72,37 @@ function App() {
             <Dashboard />
           </TalentPathLayout>
         } />
-        
+
         <Route path="/talentpath/jobs" element={
           <TalentPathLayout>
             <JobSearch />
           </TalentPathLayout>
         } />
-        
+
         <Route path="/talentpath/jobs/:jobId" element={
           <TalentPathLayout>
             <JobDetails />
           </TalentPathLayout>
         } />
-        
+
         <Route path="/talentpath/applications" element={
           <TalentPathLayout>
             <Applications />
           </TalentPathLayout>
         } />
-        
+
         <Route path="/talentpath/saved" element={
           <TalentPathLayout>
             <SavedJobs />
           </TalentPathLayout>
         } />
-        
+
         <Route path="/talentpath/profile" element={
           <TalentPathLayout>
             <Profile />
           </TalentPathLayout>
         } />
-        
+
         <Route path="/talentpath/notifications" element={
           <TalentPathLayout>
             <Notifications />
