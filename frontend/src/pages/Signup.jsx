@@ -1,13 +1,22 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { UserIcon, BuildingOfficeIcon } from '@heroicons/react/24/outline';
 import authService from '../services/auth';
 
 const Signup = () => {
+    const [userType, setUserType] = useState('employee'); // 'employee' or 'company'
     const [formData, setFormData] = useState({
         username: '',
         email: '',
         password: '',
-        confirmPassword: ''
+        confirmPassword: '',
+        first_name: '',
+        last_name: '',
+        phone: '',
+        // Company-specific fields
+        company_name: '',
+        company_website: '',
+        industry: ''
     });
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
@@ -32,12 +41,31 @@ const Signup = () => {
         setLoading(true);
 
         try {
-            await authService.signup({
+            const signupData = {
                 username: formData.username,
                 email: formData.email,
-                password: formData.password
-            });
-            navigate('/talentpath/dashboard');
+                password: formData.password,
+                first_name: formData.first_name,
+                last_name: formData.last_name,
+                user_type: userType,
+                phone: formData.phone
+            };
+
+            // Add company-specific fields if user type is company
+            if (userType === 'company') {
+                signupData.company_name = formData.company_name;
+                signupData.company_website = formData.company_website;
+                signupData.industry = formData.industry;
+            }
+
+            await authService.signup(signupData);
+
+            // Redirect based on user type
+            if (userType === 'company') {
+                navigate('/recruiter/dashboard');
+            } else {
+                navigate('/talentpath/dashboard');
+            }
         } catch (err) {
             setError(err.response?.data?.username?.[0] || err.response?.data?.email?.[0] || 'Failed to sign up. Please try again.');
         } finally {
@@ -46,106 +74,229 @@ const Signup = () => {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-black relative overflow-hidden">
-            {/* Background Glow Effects */}
-            <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0">
-                <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-900 rounded-full blur-[120px] opacity-30"></div>
-                <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-900 rounded-full blur-[120px] opacity-30"></div>
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-purple-900 to-blue-900 relative overflow-hidden py-12 px-4">
+            {/* Background Effects */}
+            <div className="absolute inset-0 overflow-hidden">
+                <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600 rounded-full blur-[120px] opacity-20"></div>
+                <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600 rounded-full blur-[120px] opacity-20"></div>
             </div>
 
-            <div className="relative z-10 w-full max-w-4xl bg-[#0a0a12] rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row border border-gray-800">
-                {/* Left Side - Decorative */}
-                <div className="hidden md:flex w-1/2 bg-gradient-to-br from-blue-900 to-purple-900 relative items-center justify-center overflow-hidden">
-                    <div className="absolute inset-0 bg-[#0a0a12] opacity-20"></div>
-                    {/* Diagonal Slice Effect */}
-                    <div className="absolute -right-12 top-0 bottom-0 w-24 bg-[#0a0a12] transform -skew-x-12 z-10"></div>
+            <div className="relative z-10 w-full max-w-5xl">
+                {/* Role Selection */}
+                <div className="mb-8">
+                    <h1 className="text-4xl font-bold text-white text-center mb-8">Create Your Account</h1>
+                    <div className="flex gap-4 max-w-2xl mx-auto">
+                        <button
+                            type="button"
+                            onClick={() => setUserType('employee')}
+                            className={`flex-1 p-6 rounded-xl border-2 transition-all ${userType === 'employee'
+                                ? 'bg-blue-600 border-blue-500 shadow-lg shadow-blue-500/50'
+                                : 'bg-gray-800/50 border-gray-700 hover:border-gray-600'
+                                }`}
+                        >
+                            <UserIcon className="w-12 h-12 mx-auto mb-3 text-white" />
+                            <h3 className="text-xl font-bold text-white mb-2">User</h3>
+                            <p className="text-gray-300 text-sm">I Deserve Better</p>
+                        </button>
 
-                    <div className="relative z-20 text-center p-8">
-                        <h2 className="text-4xl font-bold text-white mb-4">JOIN<br />US!</h2>
-                        <p className="text-gray-300 text-lg max-w-xs mx-auto">
-                            Start your journey with us today.
-                        </p>
+                        <button
+                            type="button"
+                            onClick={() => setUserType('company')}
+                            className={`flex-1 p-6 rounded-xl border-2 transition-all ${userType === 'company'
+                                ? 'bg-purple-600 border-purple-500 shadow-lg shadow-purple-500/50'
+                                : 'bg-gray-800/50 border-gray-700 hover:border-gray-600'
+                                }`}
+                        >
+                            <BuildingOfficeIcon className="w-12 h-12 mx-auto mb-3 text-white" />
+                            <h3 className="text-xl font-bold text-white mb-2">Organization</h3>
+                            <p className="text-gray-300 text-sm">I Want Achievers</p>
+                        </button>
                     </div>
                 </div>
 
-                {/* Right Side - Form */}
-                <div className="w-full md:w-1/2 p-8 md:p-12 flex flex-col justify-center relative">
-                    {/* Neon Border Effect on Right */}
-                    <div className="absolute right-0 top-0 bottom-0 w-1 bg-gradient-to-b from-blue-600 to-purple-600 shadow-[0_0_15px_rgba(147,51,234,0.5)]"></div>
-
-                    <h2 className="text-3xl font-bold text-white mb-8">Sign Up</h2>
-
+                {/* Form Card */}
+                <div className="bg-gray-900/80 backdrop-blur-sm rounded-2xl shadow-2xl border border-gray-800 p-8 md:p-12">
                     {error && (
-                        <div className="mb-4 p-3 bg-red-900/30 border border-red-800 text-red-200 rounded-lg text-sm">
+                        <div className="mb-6 p-4 bg-red-900/30 border border-red-800 text-red-200 rounded-lg">
                             {error}
                         </div>
                     )}
 
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        <div>
-                            <label className="block text-gray-400 text-sm mb-1">Username</label>
-                            <input
-                                type="text"
-                                name="username"
-                                value={formData.username}
-                                onChange={handleChange}
-                                className="w-full bg-[#13131f] border-b border-gray-700 text-white px-3 py-2 focus:outline-none focus:border-purple-500 transition-colors"
-                                placeholder="Choose a username"
-                                required
-                            />
-                        </div>
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Username */}
+                            <div>
+                                <label className="block text-gray-300 text-sm font-medium mb-2">
+                                    Username *
+                                </label>
+                                <input
+                                    type="text"
+                                    name="username"
+                                    value={formData.username}
+                                    onChange={handleChange}
+                                    className="w-full bg-gray-800 border border-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-blue-500 transition-colors"
+                                    placeholder="Choose a username"
+                                    required
+                                />
+                            </div>
 
-                        <div>
-                            <label className="block text-gray-400 text-sm mb-1">Email</label>
-                            <input
-                                type="email"
-                                name="email"
-                                value={formData.email}
-                                onChange={handleChange}
-                                className="w-full bg-[#13131f] border-b border-gray-700 text-white px-3 py-2 focus:outline-none focus:border-purple-500 transition-colors"
-                                placeholder="Enter your email"
-                                required
-                            />
-                        </div>
+                            {/* Email */}
+                            <div>
+                                <label className="block text-gray-300 text-sm font-medium mb-2">
+                                    Email *
+                                </label>
+                                <input
+                                    type="email"
+                                    name="email"
+                                    value={formData.email}
+                                    onChange={handleChange}
+                                    className="w-full bg-gray-800 border border-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-blue-500 transition-colors"
+                                    placeholder="your@email.com"
+                                    required
+                                />
+                            </div>
 
-                        <div>
-                            <label className="block text-gray-400 text-sm mb-1">Password</label>
-                            <input
-                                type="password"
-                                name="password"
-                                value={formData.password}
-                                onChange={handleChange}
-                                className="w-full bg-[#13131f] border-b border-gray-700 text-white px-3 py-2 focus:outline-none focus:border-purple-500 transition-colors"
-                                placeholder="Create a password"
-                                required
-                            />
-                        </div>
+                            {/* First Name */}
+                            <div>
+                                <label className="block text-gray-300 text-sm font-medium mb-2">
+                                    {userType === 'company' ? 'Contact First Name' : 'First Name'}
+                                </label>
+                                <input
+                                    type="text"
+                                    name="first_name"
+                                    value={formData.first_name}
+                                    onChange={handleChange}
+                                    className="w-full bg-gray-800 border border-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-blue-500 transition-colors"
+                                    placeholder="First name"
+                                />
+                            </div>
 
-                        <div>
-                            <label className="block text-gray-400 text-sm mb-1">Confirm Password</label>
-                            <input
-                                type="password"
-                                name="confirmPassword"
-                                value={formData.confirmPassword}
-                                onChange={handleChange}
-                                className="w-full bg-[#13131f] border-b border-gray-700 text-white px-3 py-2 focus:outline-none focus:border-purple-500 transition-colors"
-                                placeholder="Confirm your password"
-                                required
-                            />
+                            {/* Last Name */}
+                            <div>
+                                <label className="block text-gray-300 text-sm font-medium mb-2">
+                                    {userType === 'company' ? 'Contact Last Name' : 'Last Name'}
+                                </label>
+                                <input
+                                    type="text"
+                                    name="last_name"
+                                    value={formData.last_name}
+                                    onChange={handleChange}
+                                    className="w-full bg-gray-800 border border-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-blue-500 transition-colors"
+                                    placeholder="Last name"
+                                />
+                            </div>
+
+                            {/* Phone */}
+                            <div>
+                                <label className="block text-gray-300 text-sm font-medium mb-2">
+                                    Phone
+                                </label>
+                                <input
+                                    type="tel"
+                                    name="phone"
+                                    value={formData.phone}
+                                    onChange={handleChange}
+                                    className="w-full bg-gray-800 border border-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-blue-500 transition-colors"
+                                    placeholder="+1 (555) 000-0000"
+                                />
+                            </div>
+
+                            {/* Company-specific fields */}
+                            {userType === 'company' && (
+                                <>
+                                    <div>
+                                        <label className="block text-gray-300 text-sm font-medium mb-2">
+                                            Company Name *
+                                        </label>
+                                        <input
+                                            type="text"
+                                            name="company_name"
+                                            value={formData.company_name}
+                                            onChange={handleChange}
+                                            className="w-full bg-gray-800 border border-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-purple-500 transition-colors"
+                                            placeholder="Your company name"
+                                            required={userType === 'company'}
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-gray-300 text-sm font-medium mb-2">
+                                            Company Website
+                                        </label>
+                                        <input
+                                            type="url"
+                                            name="company_website"
+                                            value={formData.company_website}
+                                            onChange={handleChange}
+                                            className="w-full bg-gray-800 border border-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-purple-500 transition-colors"
+                                            placeholder="https://company.com"
+                                        />
+                                    </div>
+
+                                    <div className="md:col-span-2">
+                                        <label className="block text-gray-300 text-sm font-medium mb-2">
+                                            Industry
+                                        </label>
+                                        <input
+                                            type="text"
+                                            name="industry"
+                                            value={formData.industry}
+                                            onChange={handleChange}
+                                            className="w-full bg-gray-800 border border-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-purple-500 transition-colors"
+                                            placeholder="e.g., Technology, Healthcare, Finance"
+                                        />
+                                    </div>
+                                </>
+                            )}
+
+                            {/* Password */}
+                            <div>
+                                <label className="block text-gray-300 text-sm font-medium mb-2">
+                                    Password *
+                                </label>
+                                <input
+                                    type="password"
+                                    name="password"
+                                    value={formData.password}
+                                    onChange={handleChange}
+                                    className="w-full bg-gray-800 border border-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-blue-500 transition-colors"
+                                    placeholder="Create a strong password"
+                                    required
+                                />
+                            </div>
+
+                            {/* Confirm Password */}
+                            <div>
+                                <label className="block text-gray-300 text-sm font-medium mb-2">
+                                    Confirm Password *
+                                </label>
+                                <input
+                                    type="password"
+                                    name="confirmPassword"
+                                    value={formData.confirmPassword}
+                                    onChange={handleChange}
+                                    className="w-full bg-gray-800 border border-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-blue-500 transition-colors"
+                                    placeholder="Confirm your password"
+                                    required
+                                />
+                            </div>
                         </div>
 
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold py-3 rounded-full shadow-[0_0_20px_rgba(37,99,235,0.5)] hover:shadow-[0_0_30px_rgba(37,99,235,0.7)] transform hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-4"
+                            className={`w-full font-bold py-4 rounded-lg shadow-lg transform hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${userType === 'company'
+                                ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white'
+                                : 'bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white'
+                                }`}
                         >
-                            {loading ? 'Creating Account...' : 'Sign Up'}
+                            {loading ? 'Creating Account...' : `Sign Up as ${userType === 'company' ? 'Company' : 'Employee'}`}
                         </button>
                     </form>
 
-                    <p className="mt-6 text-center text-gray-400 text-sm">
+                    <p className="mt-6 text-center text-gray-400">
                         Already have an account?{' '}
-                        <Link to="/login" className="text-blue-400 hover:text-blue-300 transition-colors">
+                        <Link to="/login" className="text-blue-400 hover:text-blue-300 font-medium transition-colors">
                             Login
                         </Link>
                     </p>

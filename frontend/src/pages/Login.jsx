@@ -27,8 +27,15 @@ const Login = () => {
     setLoading(true);
 
     try {
-      await authService.login(formData.username, formData.password);
-      navigate(from, { replace: true });
+      const response = await authService.login(formData.username, formData.password);
+
+      // Role-based routing
+      const userType = response.user?.user_profile?.user_type;
+      if (userType === 'company') {
+        navigate('/recruiter/dashboard', { replace: true });
+      } else {
+        navigate(from, { replace: true });
+      }
     } catch (err) {
       setError(err.response?.data?.non_field_errors?.[0] || 'Failed to login. Please check your credentials.');
     } finally {
@@ -121,9 +128,9 @@ const Login = () => {
           <div className="absolute inset-0 bg-[#0a0a12] opacity-20"></div>
           {/* Diagonal Slice Effect */}
           <div className="absolute -left-12 top-0 bottom-0 w-24 bg-[#0a0a12] transform -skew-x-12 z-10"></div>
-          
+
           <div className="relative z-20 text-center p-8">
-            <h2 className="text-4xl font-bold text-white mb-4">WELCOME<br/>BACK!</h2>
+            <h2 className="text-4xl font-bold text-white mb-4">WELCOME<br />BACK!</h2>
             <p className="text-gray-300 text-lg max-w-xs mx-auto">
               Access your dashboard and continue your journey.
             </p>

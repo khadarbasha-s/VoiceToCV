@@ -6,6 +6,10 @@ const authService = {
         if (response.data.token) {
             localStorage.setItem("token", response.data.token);
             localStorage.setItem("user", JSON.stringify(response.data.user));
+            // Store user_type for routing
+            if (response.data.user.user_profile) {
+                localStorage.setItem("user_type", response.data.user.user_profile.user_type);
+            }
         }
         return response.data;
     },
@@ -15,6 +19,10 @@ const authService = {
         if (response.data.token) {
             localStorage.setItem("token", response.data.token);
             localStorage.setItem("user", JSON.stringify(response.data.user));
+            // Store user_type for routing
+            if (response.data.user.user_profile) {
+                localStorage.setItem("user_type", response.data.user.user_profile.user_type);
+            }
         }
         return response.data;
     },
@@ -22,6 +30,7 @@ const authService = {
     logout: () => {
         localStorage.removeItem("token");
         localStorage.removeItem("user");
+        localStorage.removeItem("user_type");
     },
 
     getCurrentUser: () => {
@@ -30,8 +39,20 @@ const authService = {
         return null;
     },
 
+    getUserType: () => {
+        return localStorage.getItem("user_type");
+    },
+
     isAuthenticated: () => {
         return !!localStorage.getItem("token");
+    },
+
+    isCompany: () => {
+        return localStorage.getItem("user_type") === 'company';
+    },
+
+    isEmployee: () => {
+        return localStorage.getItem("user_type") === 'employee';
     }
 };
 
